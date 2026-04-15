@@ -1,5 +1,8 @@
 # YuzuTool - B站弹幕自动排队工具
 
+[![Java](https://img.shields.io/badge/Java-17-blue.svg)](https://java.com)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 > 基于 [Bilibili_Danmuji](https://github.com/BanqiJane/Bilibili_Danmuji) 项目的弹幕核心功能，专门为直播间设计的弹幕自动排队系统
 
 ## 🎯 项目特色
@@ -26,6 +29,15 @@
 - **二维码登录** - 安全便捷的B站账号登录
 
 ## 🚀 快速开始
+```bash
+# 克隆项目
+git clone https://github.com/YOUR_USERNAME/YuzuTool.git
+cd YuzuTool
+
+# 编译运行
+./gradlew build
+java -jar build/libs/YuzuTool-*.jar
+```
 
 ### 环境要求
 - Java 17
