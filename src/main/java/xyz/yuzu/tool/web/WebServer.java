@@ -38,7 +38,6 @@ public class WebServer {
         app = Javalin.create(config -> {
         });
         
-        // 初始化一下配置，看看有没有保存过的cookie
         String cookie = ConfigManager.getCookie();
         if (cookie != null && !cookie.isEmpty()) {
             isLoggedIn = true;
@@ -67,12 +66,12 @@ public class WebServer {
         
         app.get("/api/qrcode/url", ctx -> {
             if (isLoggedIn) {
-                ctx.json(success("已登录"));
+                ctx.json(success("已经登录了喵~"));
                 return;
             }
             Qrcode qrcode = BilibiliApi.generateQrcode();
             if (qrcode == null) {
-                ctx.json(error("生成二维码失败喵"));
+                ctx.json(error("生成二维码失败了喵~"));
                 return;
             }
             qrcodeKey = qrcode.getQrcode_key();
@@ -97,7 +96,7 @@ public class WebServer {
                 return;
             }
             if (qrcodeKey == null) {
-                ctx.json(error("请先获取二维码"));
+                ctx.json(error("要先获取二维码喵~"));
                 return;
             }
             int code = BilibiliApi.qrcodePoll(qrcodeKey);
@@ -107,9 +106,6 @@ public class WebServer {
             switch (code) {
                 case 0:
                     isLoggedIn = true;
-                    // 扫码登录成功后本来需要拿cookie存下来
-                    // 注意：目前的扫码接口内部直接搞定了，如果要记住登录状态，
-                    // 以后可能还得从别的地方把cookie弄出来存好。
                     result.put("status", "success");
                     break;
                 case 86038:
@@ -131,12 +127,12 @@ public class WebServer {
         app.post("/api/cookie/login", ctx -> {
             String cookieParam = ctx.formParam("cookie");
             if (cookieParam == null || cookieParam.isEmpty()) {
-                ctx.json(error("Cookie不能为空"));
+                ctx.json(error("Cookie不能为空喵~"));
                 return;
             }
             ConfigManager.setCookie(cookieParam);
             isLoggedIn = true;
-            ctx.json(success("登录成功喵"));
+            ctx.json(success("登录成功了喵~"));
         });
         
         app.get("/api/config/lastRoom", ctx -> {
@@ -168,20 +164,20 @@ public class WebServer {
                 int scrollSpeedUp = scrollSpeedUpStr != null ? Integer.parseInt(scrollSpeedUpStr) : 100;
                 
                 ConfigManager.setUiSettings(bgColor, itemColor, fontColor, scrollInterval, scrollDwellTime, scrollSpeedDown, scrollSpeedUp);
-                ctx.json(success("设置已保存喵"));
+                ctx.json(success("设置已经记下啦喵~"));
             } else {
-                ctx.json(error("参数不完整喵"));
+                ctx.json(error("参数好像不够喵~"));
             }
         });
 
         app.post("/api/connect", ctx -> {
             if (!isLoggedIn) {
-                ctx.json(error("请先登录喵"));
+                ctx.json(error("要先登录才能用喵~"));
                 return;
             }
             String roomIdStr = ctx.formParam("roomId");
             if (roomIdStr == null || roomIdStr.isEmpty()) {
-                ctx.json(error("房间号不能为空喵"));
+                ctx.json(error("房间号是必须要填的喵~"));
                 return;
             }
             
@@ -189,7 +185,7 @@ public class WebServer {
             try {
                 roomId = Long.parseLong(roomIdStr);
             } catch (NumberFormatException e) {
-                ctx.json(error("房间号格式错误喵"));
+                ctx.json(error("房间号的格式看起来不对喵~"));
                 return;
             }
             
@@ -277,14 +273,13 @@ public class WebServer {
                     danmuClient.connect(roomId);
                 } catch (Exception e) {
                     isConnecting = false;
-                    // 如果有监听器，将错误传回
                     anchorName = "";
                     realRoomId = 0;
                     e.printStackTrace();
                 }
             }).start();
             
-            ctx.json(success("正在连接喵..."));
+            ctx.json(success("正在努力连接喵..."));
         });
         
         app.get("/api/status", ctx -> {
@@ -316,7 +311,7 @@ public class WebServer {
             }
             anchorName = "";
             realRoomId = 0;
-            ctx.json(success("已断开连接喵"));
+            ctx.json(success("已经断开连接了喵~"));
         });
         
         app.get("/api/queue", ctx -> {
@@ -339,7 +334,7 @@ public class WebServer {
                     queueList.add(target);
                 }
             }
-            ctx.json(success("已过号喵"));
+            ctx.json(success("已经跳过这个号了喵~"));
         });
         
         app.post("/api/queue/remove", ctx -> {
@@ -348,7 +343,7 @@ public class WebServer {
                 long uid = Long.parseLong(uidStr);
                 queueList.removeIf(item -> (long) item.get("uid") == uid);
             }
-            ctx.json(success("已移除喵"));
+            ctx.json(success("已经把它移除了喵~"));
         });
         
         app.post("/api/queue/reorder", ctx -> {
@@ -376,12 +371,12 @@ public class WebServer {
                     }
                 }
             }
-            ctx.json(success("已重排喵"));
+            ctx.json(success("重新排好队了喵~"));
         });
         
         app.get("/api/logout", ctx -> {
             isLoggedIn = false;
-            ConfigManager.setCookie(""); // 把保存的cookie清空
+            ConfigManager.setCookie("");
             BilibiliApi.setCookie(null);
             if (danmuClient != null) {
                 danmuClient.disconnect();
@@ -393,14 +388,14 @@ public class WebServer {
         });
 
         app.post("/api/shutdown", ctx -> {
-            ctx.json(success("正在关闭服务器..."));
+            ctx.json(success("正在关掉服务器喵..."));
             new Thread(() -> {
                 try {
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-                Runtime.getRuntime().halt(0); // 强行关掉程序
+                Runtime.getRuntime().halt(0);
             }).start();
         });
         
@@ -564,16 +559,16 @@ public class WebServer {
                     <div id="qrcode-tab" class="tab-content active">
                         <div class="qrcode-wrapper">
                             <div id="qrcode-placeholder" class="qrcode-placeholder" onclick="getQrcode()">
-                                <span>点击获取二维码喵</span>
+                                <span>点击获取二维码喵~</span>
                             </div>
                             <img id="qrcode-img" class="qrcode-img" src="" alt="二维码" style="display:none;">
-                            <div class="qrcode-tip">请使用哔哩哔哩 APP 扫码</div>
+                            <div class="qrcode-tip">请用哔哩哔哩APP扫码喵~</div>
                             <div id="status" class="status" style="display:none;"></div>
                         </div>
                     </div>
                     <div id="cookie-tab" class="tab-content">
                         <div class="form-group">
-                            <label>输入 Bilibili Cookie</label>
+                            <label>输入 Bilibili Cookie 喵</label>
                             <textarea id="cookie-input" placeholder="SESSDATA=...; bili_jct=...; DedeUserID=..."></textarea>
                         </div>
                         <button class="btn" onclick="cookieLogin()">登录</button>
@@ -601,14 +596,14 @@ public class WebServer {
                                 img.src = '/api/qrcode/image?t=' + Date.now();
                                 status.style.display = 'block';
                                 status.className = 'status waiting';
-                                status.textContent = '请使用B站APP扫码';
+                                status.textContent = '请用B站APP扫码喵~';
                                 if (checkInterval) clearInterval(checkInterval);
                                 checkInterval = setInterval(checkLogin, 2000);
                             } else {
-                                alert(data.message || '获取二维码失败喵');
+                                alert(data.message || '获取二维码失败了喵~');
                             }
                         } catch (e) {
-                            alert('请求失败喵: ' + e.message);
+                            alert('请求失败了喵: ' + e.message);
                         }
                     }
                     async function checkLogin() {
@@ -621,17 +616,17 @@ public class WebServer {
                                 switch (result.status) {
                                     case 'success':
                                         status.className = 'status success';
-                                        status.textContent = '登录成功喵！';
+                                        status.textContent = '登录成功了喵！';
                                         clearInterval(checkInterval);
                                         setTimeout(() => location.href = '/', 1000);
                                         break;
                                     case 'scanned':
                                         status.className = 'status scanned';
-                                        status.textContent = '已扫码，请在手机确认喵...';
+                                        status.textContent = '已经扫码啦，请在手机上确认喵...';
                                         break;
                                     case 'expired':
                                         status.className = 'status error';
-                                        status.textContent = '二维码已过期，点击刷新喵';
+                                        status.textContent = '二维码过期了，点我刷新喵~';
                                         clearInterval(checkInterval);
                                         break;
                                 }
@@ -640,7 +635,7 @@ public class WebServer {
                     }
                     async function cookieLogin() {
                         const cookie = document.getElementById('cookie-input').value;
-                        if (!cookie) { alert('请输入Cookie'); return; }
+                        if (!cookie) { alert('要输入Cookie喵~'); return; }
                         const btn = document.querySelector('#cookie-tab .btn');
                         btn.disabled = true; btn.textContent = '正在摇尾巴让B站放松警惕喵~';
                         try {
@@ -653,11 +648,11 @@ public class WebServer {
                             if (data.code === 0) {
                                 location.href = '/';
                             } else {
-                                alert(data.message || '登录失败喵');
+                                alert(data.message || '登录失败了喵~');
                                 btn.disabled = false; btn.textContent = '登录';
                             }
                         } catch (e) {
-                            alert('请求失败喵: ' + e.message);
+                            alert('请求失败了喵: ' + e.message);
                             btn.disabled = false; btn.textContent = '登录';
                         }
                     }
@@ -689,7 +684,6 @@ public class WebServer {
                         color: var(--font-color);
                         overflow-x: hidden;
                     }
-                    /* 如果选了透明背景，这里强制让页面变透明，方便在直播软件里用 */
                     body[style*="transparent"] { background: transparent !important; }
                     
                     h1 { 
@@ -718,7 +712,6 @@ public class WebServer {
                     body::-webkit-scrollbar { display: none; }
                     body { -ms-overflow-style: none; scrollbar-width: none; }
                     
-                    /* 列表进场和退场时的动画效果 */
                     .item-enter { animation: slideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
                     .item-leave { animation: slideOut 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) forwards; }
                     
@@ -765,7 +758,6 @@ public class WebServer {
                     
                     .actions { display: flex; gap: 6px; opacity: 0; transition: opacity 0.3s; }
                     .queue-item:hover .actions { opacity: 1; }
-                    /* 在手机等没有鼠标悬停的设备上，一直显示操作按钮 */
                     @media (hover: none) { .actions { opacity: 1; } }
                     
                     .btn { 
@@ -801,7 +793,6 @@ public class WebServer {
                     let dragSrcEl = null;
                     let currentList = [];
                     
-                    // 自动滚动的各种参数
                     let autoScrollConfig = { interval: 5000, dwellTime: 1000, speedDown: 50, speedUp: 100 };
                     let scrollTimer = null;
                     let isAutoScrolling = false;
@@ -824,14 +815,13 @@ public class WebServer {
                                 setupAutoScroll();
                             }
                         } catch (e) {
-                            console.error('加载UI设置失败喵', e);
+                            console.error('加载界面设置失败了喵~', e);
                         }
                     }
 
                     function setupAutoScroll() {
                         if (scrollTimer) clearTimeout(scrollTimer);
                         
-                        // 看看页面是不是太长了，长到出现了滚动空间
                         const maxScrollTop = document.documentElement.scrollHeight - window.innerHeight;
                         if (maxScrollTop > 0 && !isAutoScrolling) {
                             scrollTimer = setTimeout(performScroll, autoScrollConfig.interval);
@@ -861,7 +851,7 @@ public class WebServer {
                                 return;
                             }
                             
-                            currentPos += (autoScrollConfig.speedDown / 10); // 每次往下滚一丁点距离
+                            currentPos += (autoScrollConfig.speedDown / 10);
                             window.scrollTo(0, currentPos);
                             
                             if (currentPos >= maxScrollTop) {
@@ -916,7 +906,7 @@ public class WebServer {
                                 renderQueue(data.data);
                             }
                         } catch (e) {
-                            console.error('获取排队列表失败喵', e);
+                            console.error('获取排队列表失败了喵~', e);
                         }
                     }
                     
@@ -925,8 +915,8 @@ public class WebServer {
                         const wasScrollable = document.documentElement.scrollHeight > window.innerHeight;
                         
                         if (!newList || newList.length === 0) {
-                            if (currentList.length > 0 || container.innerHTML.includes('加载中')) {
-                                container.innerHTML = '<div class="empty">暂无排队人员</div>';
+                            if (currentList.length > 0 || container.innerHTML.includes('加载中') || container.innerHTML.includes('螺旋桨')) {
+                                container.innerHTML = '<div class="empty">现在还没有人排队喵~</div>';
                                 currentList = [];
                             }
                             return;
@@ -940,7 +930,6 @@ public class WebServer {
                             let el = document.querySelector(`.queue-item[data-uid="${item.uid}"]`);
                             
                             if (!el) {
-                                // 发现新来排队的，给他做个牌子
                                 el = document.createElement('div');
                                 el.className = 'queue-item item-enter';
                                 el.draggable = true;
@@ -994,7 +983,7 @@ public class WebServer {
                                     setTimeout(() => {
                                         if (el.parentNode) el.parentNode.removeChild(el);
                                         if (container.children.length === 0) {
-                                            container.innerHTML = '<div class="empty">暂无排队人员</div>';
+                                            container.innerHTML = '<div class="empty">现在还没有人排队喵~</div>';
                                         }
                                     }, 300);
                                 }
@@ -1067,7 +1056,6 @@ public class WebServer {
                         const newIndex = Array.from(container.children).indexOf(this);
                         const uid = this.dataset.uid;
                         
-                        // 如果真的换位置了，才去告诉服务器
                         const originalIndex = currentList.findIndex(item => String(item.uid) === String(uid));
                         if (originalIndex !== newIndex && originalIndex !== -1) {
                             try {
@@ -1078,7 +1066,7 @@ public class WebServer {
                                 });
                                 fetchQueue();
                             } catch (e) {
-                                console.error('重排失败喵', e);
+                                console.error('重新排队失败了喵~', e);
                             }
                         }
                     }
@@ -1092,7 +1080,7 @@ public class WebServer {
                             });
                             fetchQueue();
                         } catch (e) {
-                            alert('操作失败喵');
+                            alert('操作失败了喵~');
                         }
                     }
                     
@@ -1107,7 +1095,7 @@ public class WebServer {
                             });
                             fetchQueue();
                         } catch (e) {
-                            alert('操作失败喵');
+                            alert('操作失败了喵~');
                         }
                     }
                     
@@ -1279,19 +1267,19 @@ public class WebServer {
                             <button class="btn btn-outline" id="queue-btn" onclick="openQueue()" style="display:none; padding: 8px 16px; font-size: 13px;">独立排队窗口</button>
                         </div>
                         <div class="form-row">
-                            <input type="text" id="room-id" placeholder="输入 Bilibili 房间号">
-                            <button class="btn" id="connect-btn" onclick="connect()">入侵直播间</button>
-                            <button class="btn btn-danger" id="disconnect-btn" onclick="disconnect()" style="display:none;">断开直播间</button>
+                            <input type="text" id="room-id" placeholder="输入 Bilibili 房间号喵">
+                            <button class="btn" id="connect-btn" onclick="connect()">连接直播间喵</button>
+                            <button class="btn btn-danger" id="disconnect-btn" onclick="disconnect()" style="display:none;">断开连接喵</button>
                         </div>
                     </div>
                     
                     <div class="card">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                             <h2><svg style="width:24px;height:24px;margin-right:8px;color:var(--primary);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg> 实时弹幕</h2>
-                            <span id="danmu-count" style="font-size:13px; font-weight:600; color:var(--primary); background:rgba(79, 70, 229, 0.1); padding: 4px 12px; border-radius: 12px;">0 条</span>
+                            <span id="danmu-count" style="font-size:13px; font-weight:600; color:var(--primary); background:rgba(79, 70, 229, 0.1); padding: 4px 12px; border-radius: 12px;">0 条喵</span>
                         </div>
                         <div class="danmu-list" id="danmu-list">
-                            <div class="empty">暂无弹幕数据喵</div>
+                            <div class="empty">暂时还没有弹幕喵~</div>
                         </div>
                     </div>
                     
@@ -1367,27 +1355,26 @@ public class WebServer {
                                 <input type="number" id="scroll-speed-up" value="100" min="10" max="1000" style="padding: 12px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.1); background: rgba(255,255,255,0.8);">
                             </div>
                         </div>
-                        <button class="btn" style="width:100%" onclick="saveUiSettings()">应用配置</button>
+                        <button class="btn" style="width:100%" onclick="saveUiSettings()">保存设置喵</button>
                     </div>
                     
                     <div class="actions-card">
-                        <button class="btn btn-outline" onclick="location.href='/api/logout'">切换账号退出</button>
+                        <button class="btn btn-outline" onclick="location.href='/api/logout'">退出登录喵</button>
                         <button class="btn btn-danger" onclick="shutdownServer()">
                             <svg style="width:18px;height:18px;margin-right:6px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
-                            停止服务并退出工具
+                            关掉工具喵
                         </button>
                     </div>
                 </div>
                 <script>
                     async function shutdownServer() {
-                        if (confirm('真的要关闭服务器吗~，关闭了我就消失了哦~')) {
+                        if (confirm('真的要关掉我吗？关掉的话我就消失了喵~')) {
                             try {
                                 await fetch('/api/shutdown', { method: 'POST' });
-                                alert('服务器已关闭，现在可以安全退出该页面了喵');
-                                // 如果浏览器允许的话，顺手把这个网页也关了
+                                alert('服务器已经关掉了，现在可以安全退出啦喵~');
                                 window.close();
                             } catch (e) {
-                                alert('服务器可能已关闭');
+                                alert('服务器可能已经关掉了喵~');
                             }
                         }
                     }
@@ -1397,10 +1384,10 @@ public class WebServer {
                     let statusInterval = null;
                     async function connect() {
                         const roomId = document.getElementById('room-id').value;
-                        if (!roomId) { alert('请长官给我入侵目标喵！'); return; }
+                        if (!roomId) { alert('请告诉我房间号喵！'); return; }
                         const btn = document.getElementById('connect-btn');
                         btn.disabled = true;
-                        btn.textContent = '正在努力入侵直播间喵~';
+                        btn.textContent = '正在努力连接直播间喵~';
                         try {
                             const res = await fetch('/api/connect', {
                                 method: 'POST',
@@ -1413,20 +1400,20 @@ public class WebServer {
                                 statusInterval = setInterval(() => {
                                     checkStatus();
                                     const statusEl = document.getElementById('status');
-                                    if (statusEl && statusEl.textContent.startsWith('已连接')) {
+                                    if (statusEl && statusEl.textContent.startsWith('已经连接到')) {
                                         clearInterval(statusInterval);
                                     }
                                 }, 500);
                                 pollInterval = setInterval(pollDanmu, 1000);
                             } else {
-                                alert(data.message || '连接失败喵');
+                                alert(data.message || '连接失败了喵~');
                                 btn.disabled = false;
-                                btn.textContent = '连接';
+                                btn.textContent = '连接直播间喵';
                             }
                         } catch (e) {
-                            alert('请求失败喵: ' + e.message);
+                            alert('请求失败了喵: ' + e.message);
                             btn.disabled = false;
-                            btn.textContent = '连接';
+                            btn.textContent = '连接直播间喵';
                         }
                     }
                     async function disconnect() {
@@ -1451,25 +1438,23 @@ public class WebServer {
                                 const disconnectBtn = document.getElementById('disconnect-btn');
                                 const queueBtn = document.getElementById('queue-btn');
                                 if (status.anchorName || status.realRoomId > 0) {
-                                    statusEl.textContent = '已经连接到' + (status.anchorName || '直播间') + '的直播间了喵~ ' + ' (房间号是 ' + status.realRoomId + ' + '喵')';
+                                    statusEl.textContent = '已经连接到 ' + (status.anchorName || '直播间') + ' 的直播间了喵~ (房间号: ' + status.realRoomId + ')';
                                     connectBtn.style.display = 'none';
                                     disconnectBtn.style.display = 'inline-block';
                                     queueBtn.style.display = 'inline-block';
                                     isConnected = true;
                                     
-                                    // 重新加载页面时，如果已连接但没启动定时器，则启动
                                     if (!pollInterval) {
                                         pollInterval = setInterval(pollDanmu, 1000);
-                                        // 立即拉取一次
                                         pollDanmu();
                                     }
                                 } else if (status.isConnecting) {
-                                    statusEl.textContent = '正在努力入侵直播间喵~';
+                                    statusEl.textContent = '正在努力连接直播间喵~';
                                 } else {
                                     statusEl.textContent = '还没连接到直播间喵~';
                                     connectBtn.style.display = 'inline-block';
                                     connectBtn.disabled = false;
-                                    connectBtn.textContent = '连接';
+                                    connectBtn.textContent = '连接直播间喵';
                                     disconnectBtn.style.display = 'none';
                                     queueBtn.style.display = 'none';
                                     isConnected = false;
@@ -1502,7 +1487,7 @@ public class WebServer {
                                         el.innerHTML = '<span class="gift-icon">🎁</span> <span class="username">' + item.username + '</span> 送出 ' + item.giftName + ' x' + item.num;
                                     } else if (item.type === 'enter') {
                                         el.className += ' enter';
-                                        el.innerHTML = item.username + ' 进入直播间了喵';
+                                        el.innerHTML = item.username + ' 溜进直播间了喵~';
                                     }
                                     list.insertBefore(el, list.firstChild);
                                     lastTime = Math.max(lastTime, item.time);
@@ -1510,7 +1495,7 @@ public class WebServer {
                                 while (list.children.length > 100) {
                                     list.removeChild(list.lastChild);
                                 }
-                                document.getElementById('danmu-count').textContent = '(共 ' + list.children.length + ' 条弹~)';
+                                document.getElementById('danmu-count').textContent = '(共 ' + list.children.length + ' 条喵)';
                             }
                         } catch (e) {}
                     }
@@ -1594,12 +1579,12 @@ public class WebServer {
                             });
                             const data = await res.json();
                             if (data.code === 0) {
-                                alert('嗯嗯！已经记到小本本上了喵~');
+                                alert('嗯嗯！设置已经保存好了喵~');
                             } else {
-                                alert(data.message || '可恶！我的小本本不见了，保存失败了喵~');
+                                alert(data.message || '呜呜，保存设置失败了喵~');
                             }
                         } catch (e) {
-                            alert('请求失败喵: ' + e.message);
+                            alert('请求失败了喵: ' + e.message);
                         }
                     }
                     
