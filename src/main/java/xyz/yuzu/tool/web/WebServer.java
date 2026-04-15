@@ -1280,8 +1280,8 @@ public class WebServer {
                         </div>
                         <div class="form-row">
                             <input type="text" id="room-id" placeholder="输入 Bilibili 房间号">
-                            <button class="btn" id="connect-btn" onclick="connect()">连接弹幕</button>
-                            <button class="btn btn-danger" id="disconnect-btn" onclick="disconnect()" style="display:none;">断开连接</button>
+                            <button class="btn" id="connect-btn" onclick="connect()">入侵直播间</button>
+                            <button class="btn btn-danger" id="disconnect-btn" onclick="disconnect()" style="display:none;">断开直播间</button>
                         </div>
                     </div>
                     
