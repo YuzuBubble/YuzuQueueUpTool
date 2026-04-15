@@ -1,0 +1,8 @@
+pluginManagement {
+    repositories {
+        maven { name 'aliyunmaven'; url 'https://maven.aliyun.com/nexus/content/groups/public/' }
+        gradlePluginPortal()
+    }
+}
+
+rootProject.name = 'YuzuTool'

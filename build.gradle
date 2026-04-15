@@ -1,0 +1,50 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+application {
+    mainClass = 'xyz.yuzu.tool.YuzuToolApplication'
+}
+
+group = 'xyz.yuzu'
+version = '0.0.1'
+
+[compileJava, compileTestJava, javadoc]*.options*.encoding = 'UTF-8'
+
+repositories {
+    maven { name 'aliyunmaven'; url 'https://maven.aliyun.com/nexus/content/groups/public/' }
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'io.javalin:javalin:5.6.3'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.15.0'
+    implementation 'org.slf4j:slf4j-simple:2.0.9'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.3'
+    implementation 'com.alibaba:fastjson:1.2.83'
+    implementation 'com.squareup.okhttp3:okhttp:3.14.9'
+    implementation 'org.apache.commons:commons-lang3:3.10'
+    implementation 'org.apache.commons:commons-compress:1.23.0'
+    implementation 'org.brotli:dec:0.1.2'
+    implementation 'cn.hutool:hutool-cache:5.8.22'
+    implementation 'com.google.zxing:core:3.5.1'
+    implementation 'com.google.zxing:javase:3.5.1'
+    compileOnly 'org.projectlombok:lombok:1.18.28'
+    annotationProcessor 'org.projectlombok:lombok:1.18.28'
+    implementation fileTree(dir: 'lib', includes: ['*.jar'])
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'xyz.yuzu.tool.YuzuToolApplication'
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
