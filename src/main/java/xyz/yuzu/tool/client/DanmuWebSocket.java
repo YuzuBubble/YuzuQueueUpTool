@@ -36,6 +36,9 @@ class DanmuWebSocket extends WebSocketClient {
     
     @Override
     public void onError(Exception ex) {
+        // Some WebSocket errors don't trigger onClose but mean the connection is dead
+        // We'll call onClose explicitly if it's a critical error, but usually
+        // the WebSocket library will call onClose after onError anyway.
         client.onError(this, ex);
     }
 }

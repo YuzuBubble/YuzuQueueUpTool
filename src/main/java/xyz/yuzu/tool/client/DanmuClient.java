@@ -40,6 +40,11 @@ public class DanmuClient {
     private long anchorUid;
     private String anchorName;
     
+    // 缓存认证信息用于快速重连
+    private List<HostServer> cachedHostList;
+    private byte[] cachedAuthBytes;
+    private long cacheTime = 0;
+    
     public void setDanmuListener(DanmuListener listener) {
         this.danmuListener = listener;
     }
@@ -85,6 +90,11 @@ public class DanmuClient {
         }
         byte[] authBytes = buildAuthPackage(authData);
         byte[] heartBeatBytes = HexUtils.fromHexString(HEART_BEAT);
+        
+        // 保存到缓存用于快速重连
+        this.cachedHostList = hostList;
+        this.cachedAuthBytes = authBytes;
+        this.cacheTime = System.currentTimeMillis();
         
         Exception lastException = null;
         boolean authSuccess = false;
@@ -182,6 +192,9 @@ public class DanmuClient {
     }
     
     private void startParseThread() {
+        if (parseThread != null) {
+            parseThread.interrupt();
+        }
         parseThread = new Thread(() -> {
             while (running.get()) {
                 try {
@@ -198,6 +211,8 @@ public class DanmuClient {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
+                } catch (Exception e) {
+                    // ignore
                 }
             }
         });
@@ -205,16 +220,21 @@ public class DanmuClient {
     }
     
     private void startHeartBeatThread() {
+        if (heartBeatThread != null) {
+            heartBeatThread.interrupt();
+        }
         heartBeatThread = new Thread(() -> {
             while (running.get()) {
                 try {
-                    Thread.sleep(30000);
-                    if (webSocket != null && webSocket.isOpen()) {
+                    Thread.sleep(20000); // Reduce heartbeat interval to 20 seconds
+                    if (webSocket != null && webSocket.isOpen() && running.get()) {
                         webSocket.send(HexUtils.fromHexString(HEART_BEAT));
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
+                } catch (Exception e) {
+                    // ignore
                 }
             }
         });
@@ -387,16 +407,18 @@ public class DanmuClient {
     
     void onClose(DanmuWebSocket source, int code) {
         if (this.webSocket != source) {
-            System.out.println("忽略旧的弹幕连接断开事件，代码: " + code);
+            System.out.println(String.format("[%tT] 忽略旧的弹幕连接断开事件，代码: %d", System.currentTimeMillis(), code));
             return;
         }
-        System.out.println("弹幕连接断开，代码: " + code);
+        System.out.println(String.format("[%tT] 弹幕连接断开，代码: %d", System.currentTimeMillis(), code));
         running.set(false);
         if (parseThread != null) {
             parseThread.interrupt();
+            parseThread = null;
         }
         if (heartBeatThread != null) {
             heartBeatThread.interrupt();
+            heartBeatThread = null;
         }
         
         if (!isManualDisconnect && hasSuccessfullyConnected) {
@@ -418,13 +440,32 @@ public class DanmuClient {
     private void reconnect() {
         new Thread(() -> {
             int retryCount = 0;
+            long reconnectStartTime = System.currentTimeMillis();
+            System.out.println(String.format("[%tT] 触发断线重连机制，准备发起重连流程...", reconnectStartTime));
             while (!isManualDisconnect) {
                 try {
-                    Thread.sleep(5000);
+                    // Start with a very short wait to minimize data loss, then increase on subsequent failures
+                    long waitTime = retryCount == 0 ? 500 : 3000;
+                    Thread.sleep(waitTime);
                     if (isManualDisconnect) break;
-                    System.out.println("正在尝试重新连接 (第 " + (retryCount + 1) + " 次)...");
-                    connect(this.roomId);
-                    System.out.println("重连成功！");
+                    
+                    long beforeConnectTime = System.currentTimeMillis();
+                    System.out.println(String.format("[%tT] 正在尝试重新连接 (第 %d 次), 距离触发已过 %d ms...", 
+                                        beforeConnectTime, (retryCount + 1), (beforeConnectTime - reconnectStartTime)));
+                    
+                    // 如果缓存有效（例如2小时内），使用快速重连跳过HTTP请求
+                    if (cachedHostList != null && cachedAuthBytes != null && (System.currentTimeMillis() - cacheTime < 2 * 60 * 60 * 1000)) {
+                        System.out.println("使用缓存凭据进行快速重连...");
+                        fastReconnect();
+                    } else {
+                        System.out.println("缓存无效或过期，重新获取凭据...");
+                        connect(this.roomId);
+                    }
+                    
+                    long afterConnectTime = System.currentTimeMillis();
+                    System.out.println(String.format("[%tT] 重连成功！本次重连耗时 %d ms. 距离断线总计耗时 %d ms.", 
+                                        afterConnectTime, (afterConnectTime - beforeConnectTime), (afterConnectTime - reconnectStartTime)));
+                                        
                     isReconnecting.set(false);
                     return;
                 } catch (InterruptedException e) {
@@ -432,7 +473,13 @@ public class DanmuClient {
                     break;
                 } catch (Exception e) {
                     retryCount++;
-                    System.out.println("重连失败: " + e.getMessage());
+                    long failTime = System.currentTimeMillis();
+                    System.out.println(String.format("[%tT] 重连失败: %s. 距离断线总计耗时 %d ms.", 
+                                        failTime, e.getMessage(), (failTime - reconnectStartTime)));
+                    
+                    // 如果快速重连失败，清空缓存，下一次重试将强制完全连接
+                    this.cachedHostList = null;
+                                        
                     if (retryCount >= 10) {
                         System.out.println("重试次数过多，放弃重连。");
                         isReconnecting.set(false);
@@ -447,6 +494,67 @@ public class DanmuClient {
             }
             isReconnecting.set(false);
         }).start();
+    }
+    
+    private void fastReconnect() throws Exception {
+        byte[] heartBeatBytes = HexUtils.fromHexString(HEART_BEAT);
+        Exception lastException = null;
+        boolean authSuccess = false;
+        
+        java.util.Collections.shuffle(this.cachedHostList);
+        int limit = Math.min(3, this.cachedHostList.size());
+        
+        for (int i = 0; i < limit; i++) {
+            HostServer host = this.cachedHostList.get(i);
+            String wsUrl = String.format("wss://%s:%d/sub", host.getHost(), host.getWss_port() != null ? host.getWss_port() : 443);
+            try {
+                if (webSocket != null) {
+                    webSocket.close();
+                }
+                hasAuthResponded = false;
+                isAuthSuccess = false;
+                
+                webSocket = new DanmuWebSocket(wsUrl, this);
+                if (webSocket.connectBlocking(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                    webSocket.send(this.cachedAuthBytes);
+                    webSocket.send(heartBeatBytes);
+                    
+                    long startTime = System.currentTimeMillis();
+                    while (System.currentTimeMillis() - startTime < 3000) {
+                        if (hasAuthResponded) {
+                            break;
+                        }
+                        Thread.sleep(100);
+                    }
+                    
+                    if (hasAuthResponded && isAuthSuccess) {
+                        authSuccess = true;
+                        System.out.println("快速重连：成功连接并鉴权到弹幕节点: " + host.getHost());
+                        break;
+                    } else {
+                        System.out.println("快速重连：弹幕节点鉴权超时或失败: " + host.getHost());
+                        webSocket.close();
+                        lastException = new Exception("节点鉴权超时或失败: " + host.getHost());
+                    }
+                } else {
+                    lastException = new Exception("连接弹幕服务器节点超时: " + host.getHost());
+                }
+            } catch (Exception e) {
+                lastException = e;
+            }
+        }
+        
+        if (!authSuccess) {
+            if (lastException != null) {
+                throw new Exception("快速重连失败: " + lastException.getMessage(), lastException);
+            } else {
+                throw new Exception("快速重连失败");
+            }
+        }
+        
+        running.set(true);
+        startParseThread();
+        startHeartBeatThread();
     }
     
     void onError(DanmuWebSocket source, Exception ex) {
