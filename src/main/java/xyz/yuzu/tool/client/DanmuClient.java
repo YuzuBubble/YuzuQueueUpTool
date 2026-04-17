@@ -31,6 +31,9 @@ public class DanmuClient {
     
     private volatile boolean hasAuthResponded = false;
     private volatile boolean isAuthSuccess = false;
+    private volatile boolean isManualDisconnect = false;
+    private volatile boolean hasSuccessfullyConnected = false;
+    private final java.util.concurrent.atomic.AtomicBoolean isReconnecting = new java.util.concurrent.atomic.AtomicBoolean(false);
     
     private long roomId;
     private long realRoomId;
@@ -42,6 +45,8 @@ public class DanmuClient {
     }
     
     public void connect(long roomId) throws Exception {
+        this.isManualDisconnect = false;
+        this.hasSuccessfullyConnected = false;
         this.roomId = roomId;
         
         RoomInit roomInit = BilibiliApi.getRoomInit(roomId);
@@ -139,6 +144,8 @@ public class DanmuClient {
             }
         }
         
+        this.hasSuccessfullyConnected = true;
+        
         startParseThread();
         startHeartBeatThread();
         running.set(true);
@@ -149,6 +156,7 @@ public class DanmuClient {
     }
     
     public void disconnect() {
+        this.isManualDisconnect = true;
         running.set(false);
         if (parseThread != null) {
             parseThread.interrupt();
@@ -213,7 +221,8 @@ public class DanmuClient {
         heartBeatThread.start();
     }
     
-    void onMessage(ByteBuffer message) {
+    void onMessage(DanmuWebSocket source, ByteBuffer message) {
+        if (this.webSocket != source) return; // Ignore messages from old websockets
         try {
             handleMessage(message);
         } catch (Exception e) {
@@ -376,15 +385,72 @@ public class DanmuClient {
         }
     }
     
-    void onClose(int code) {
+    void onClose(DanmuWebSocket source, int code) {
+        if (this.webSocket != source) {
+            System.out.println("忽略旧的弹幕连接断开事件，代码: " + code);
+            return;
+        }
         System.out.println("弹幕连接断开，代码: " + code);
         running.set(false);
-        if (danmuListener != null) {
-            danmuListener.onDisconnect();
+        if (parseThread != null) {
+            parseThread.interrupt();
+        }
+        if (heartBeatThread != null) {
+            heartBeatThread.interrupt();
+        }
+        
+        if (!isManualDisconnect && hasSuccessfullyConnected) {
+            if (isReconnecting.compareAndSet(false, true)) {
+                System.out.println("非主动断开，准备重连...");
+                reconnect();
+            } else {
+                System.out.println("已经在重连中，忽略本次 onClose");
+            }
+        } else {
+            if (!isReconnecting.get()) {
+                if (danmuListener != null) {
+                    danmuListener.onDisconnect();
+                }
+            }
         }
     }
     
-    void onError(Exception ex) {
+    private void reconnect() {
+        new Thread(() -> {
+            int retryCount = 0;
+            while (!isManualDisconnect) {
+                try {
+                    Thread.sleep(5000);
+                    if (isManualDisconnect) break;
+                    System.out.println("正在尝试重新连接 (第 " + (retryCount + 1) + " 次)...");
+                    connect(this.roomId);
+                    System.out.println("重连成功！");
+                    isReconnecting.set(false);
+                    return;
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (Exception e) {
+                    retryCount++;
+                    System.out.println("重连失败: " + e.getMessage());
+                    if (retryCount >= 10) {
+                        System.out.println("重试次数过多，放弃重连。");
+                        isReconnecting.set(false);
+                        this.hasSuccessfullyConnected = false;
+                        if (danmuListener != null) {
+                            danmuListener.onError("重连失败次数过多，已断开喵~");
+                            danmuListener.onDisconnect();
+                        }
+                        break;
+                    }
+                }
+            }
+            isReconnecting.set(false);
+        }).start();
+    }
+    
+    void onError(DanmuWebSocket source, Exception ex) {
+        if (this.webSocket != source) return;
         System.out.println("弹幕连接发生错误: " + ex.getMessage());
         if (danmuListener != null) {
             danmuListener.onError(ex.getMessage());

@@ -260,12 +260,19 @@ public class WebServer {
                     
                     @Override
                     public void onDisconnect() {
+                        // The connection is fully disconnected. Only reset connection state if it's currently marked as connected.
+                        if (realRoomId > 0 || !anchorName.isEmpty()) {
+                            anchorName = "";
+                            realRoomId = 0;
+                        }
                         isConnecting = false;
                     }
                     
                     @Override
                     public void onError(String error) {
-                        isConnecting = false;
+                        // Keep track of errors but don't reset connection state automatically
+                        // as auto-reconnect might be attempting to recover.
+                        System.err.println("DanmuClient Error: " + error);
                     }
                 });
                 

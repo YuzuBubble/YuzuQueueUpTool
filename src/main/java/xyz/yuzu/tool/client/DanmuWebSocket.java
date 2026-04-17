@@ -26,16 +26,16 @@ class DanmuWebSocket extends WebSocketClient {
     
     @Override
     public void onMessage(ByteBuffer message) {
-        client.onMessage(message);
+        client.onMessage(this, message);
     }
     
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        client.onClose(code);
+        client.onClose(this, code);
     }
     
     @Override
     public void onError(Exception ex) {
-        client.onError(ex);
+        client.onError(this, ex);
     }
 }
