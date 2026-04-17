@@ -156,9 +156,9 @@ public class DanmuClient {
         
         this.hasSuccessfullyConnected = true;
         
+        running.set(true);
         startParseThread();
         startHeartBeatThread();
-        running.set(true);
         
         if (danmuListener != null) {
             danmuListener.onConnect(anchorName, realRoomId);
@@ -421,18 +421,17 @@ public class DanmuClient {
             heartBeatThread = null;
         }
         
+        // 关键修复：任何时候发生真正的物理断开，都先通知上层“断开”，消除“假连接”的 UI
+        if (danmuListener != null) {
+            danmuListener.onDisconnect();
+        }
+        
         if (!isManualDisconnect && hasSuccessfullyConnected) {
             if (isReconnecting.compareAndSet(false, true)) {
                 System.out.println("非主动断开，准备重连...");
                 reconnect();
             } else {
                 System.out.println("已经在重连中，忽略本次 onClose");
-            }
-        } else {
-            if (!isReconnecting.get()) {
-                if (danmuListener != null) {
-                    danmuListener.onDisconnect();
-                }
             }
         }
     }
