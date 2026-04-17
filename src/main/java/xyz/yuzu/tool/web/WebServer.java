@@ -229,6 +229,10 @@ public class WebServer {
                                 queueList.add(queueItem);
                             }
                         }
+                        
+                        if ("取消排队".equals(message.trim())) {
+                            queueList.removeIf(item -> (long) item.get("uid") == uid);
+                        }
                     }
                     
                     @Override
